@@ -4,6 +4,8 @@ import sys
 
 from networkGame import SNGame
 
+num_rounds = 1000
+
 def demo(game_type):
     n = 7
     k = 2
@@ -31,16 +33,26 @@ def demo(game_type):
         f_array.append (entry)
 
     # deltas = rand.random(n)*3 # Uniform from [0,3)
-    deltas = np.array([0.0,0.1,0.2,0.3,0.4,0.5,0.6])
+    deltas = np.array([0.0,0.2,0.4,0.6,0.8,1.0,1.2])
+    delta_set = np.zeros([num_rounds+2,n])
+    delta_set[0] = deltas
+    print(delta_set[0:5])
 
     game = SNGame(n,k,network,f_array,f_array,deltas=deltas,game_type=game_type)
     print("Successfully initialized")
     print("Playing first round ")
     game.play_round()
     game.print_game()
-    for i in range(10000):
+    game.update_collab()
+    delta_set[1] = game.deltas
+    # game.print_game()
+
+    for i in range(num_rounds):
         game.play_round()
+        game.update_collab()
+        delta_set[i+2] = game.deltas
     game.print_game()
+    np.save('demo_trial1.npy')
 
 if __name__ == "__main__":
     demo(sys.argv[1])
