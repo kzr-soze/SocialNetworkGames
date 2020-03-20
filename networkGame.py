@@ -224,7 +224,7 @@ class SNGame:
                     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[leader][follower]['delta_min']
                 temp = greedy_response2[playL]
-                self.perceived_deltas[leader][follower]['delta_min'] = B[playL,temp] - B[playL,playF]
+                self.perceived_deltas[leader][follower]['delta_min'] = np.maximum(B[playL,temp] - B[playL,playF],holder)
                 if (leader == 5 or follower == 5) and debugging:
                     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
             # Follower generated lower than expected social utility
@@ -239,7 +239,7 @@ class SNGame:
                     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[leader][follower]['delta_max']
                 temp = greedy_response2[playL]
-                self.perceived_deltas[leader][follower]['delta_max'] = B[playL,temp] - B[playL,exp_playF]
+                self.perceived_deltas[leader][follower]['delta_max'] = np.minimum(B[playL,temp] - B[playL,exp_playF],holder)
                 if (leader == 5 or follower == 5) and debugging:
                     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
         else:
@@ -288,7 +288,8 @@ class SNGame:
                     print(C)
                     print([(exp_playL,exp_playFF),(playL,exp_playF)])
                     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
-                self.perceived_deltas[follower][leader]['delta_min'] = best1 - A[playL,exp_playF]
+                holder = self.perceived_deltas[follower][leader]['delta_min']
+                self.perceived_deltas[follower][leader]['delta_min'] = np.maximum(best1 - A[playL,exp_playF],holder)
                 if (leader == 5 or follower == 5) and debugging:
                     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
             # Leader expected to generate less social utility than follower expected it to expect
