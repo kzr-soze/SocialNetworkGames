@@ -11,6 +11,8 @@ explore_scalar =0.85
 update_prob = 1.0/100
 lazy_factor = 0.0
 cost = 0
+rho = 0.8
+lexicographic = False
 
 # Plays a Leader-Follower game
 def playLFE(A,B,delta1,delta2,assumed_delta2=-1):
@@ -66,11 +68,12 @@ class SNGame:
         self.m = m
         self.known_deltas=known_deltas
         if len(deltas) == 0:
-            deltas = np.zeros([n,1])
+            self.deltas = np.zeros([n,1])
+        else:
+            self.deltas = deltas
         self.network = network # assumed to be connectivity matrix
-        self.deltas = np.zeros([n,1])
         self.fixed_deltas = fixed_deltas
-        self.game_type = game_type
+        self.game_type = game_type # Parameter for potential future extensions
         self.total_values = np.zeros([n])
         self.distributionsL = distributionsL
         self.distributionsF = distributionsF
@@ -104,46 +107,6 @@ class SNGame:
                     entry['delta_estimate'] = (entry['delta_max'] + entry['delta_min'])/2.0
                     perceptions[j] = entry
                 self.perceived_deltas[i] = perceptions
-        # print("Estimating Expectations...")
-        # print("Delta values: %s" %self.deltas)
-        # print(deltas)
-        # if self.uniform and self.known_deltas:
-        #     # print("Uniform Game")
-        #     i = 0
-        #     j = self.neighbors[i][0]
-        #     for g in range(m):
-        #         for h in range(m):
-        #             for place_holder in range(exp_util_memory):
-        #                 self.deltas[i] = g * (delta_max/(m-1))
-        #                 self.deltas[j] = h * (delta_max/(m-1))
-        #                 (leader_utility,_) = self.play_game(i,j,estimating=True)
-        #                 self.expected_utility[i,j,g,h,0] += leader_utility
-        #                 (_,follower_utility) = self.play_game(j,i,estimating=True)
-        #                 self.expected_utility[i,j,g,h,1] += follower_utility
-        #         # print(g)
-        #     self.expected_utility /= exp_util_memory
-        #     for l1 in range(n):
-        #         for l2 in range(n):
-        #             self.expected_utility[l1,l2,:,:,:] = self.expected_utility[i,j,:,:,:]
-
-        # else:
-        #     for i in range(n):
-        #         for j in range(n):
-        #             print((i,j))
-        #             if j in self.neighbors[i]:
-        #                 for g in range(m):
-        #                     for h in range(m):
-        #                         for place_holder in range(exp_util_memory):
-        #                             self.deltas[i] = g * (delta_max/(m-1))
-        #                             self.deltas[j] = h * (delta_max/(m-1))
-        #                             (leader_utility,_) = self.play_game(i,j,estimating=True)
-        #                             self.expected_utility[i,j,g,h,0] += leader_utility
-        #                             (_,follower_utility) = self.play_game(j,i,estimating=True)
-        #                             self.expected_utility[i,j,g,h,1] += follower_utility
-        self.deltas = deltas
-        # print("Delta values: %s" %self.deltas)
-        # print(deltas)
-        # print("Finished Estimations, beginning rounds")
 
     def print_game(self):
         print("Number of players: %s" % self.n)
@@ -174,7 +137,6 @@ class SNGame:
             i = greedy_response2[k]
             j = (i+1) % 2
 
-
             # Compute how follower will respond to k
             if C[k,j] >= C[k,i] and B[k,i] - B[k,j] <= delta2:
                 response2[k] = j
@@ -188,7 +150,7 @@ class SNGame:
                 assumed_response2[k] = i
         i = -1
         best1 = -1
-        # print(assumed_response2)
+
         # Compute player 1's assumed highest utility
         for k in range(2):
             respk = int(assumed_response2[k])
@@ -209,16 +171,6 @@ class SNGame:
         #Update leader's perception of follower
         exp_playF = int(assumed_response2[playL])
 
-        if flag and debugging:
-            print('a')
-            print(response2)
-            print('b')
-            print(greedy_response2)
-            print('c')
-            print(assumed_response2)
-            print('d')
-            print([playL,playF])
-
         a11 = self.perceived_deltas[leader][follower]['delta_min']
         a12 = self.perceived_deltas[leader][follower]['delta_max']
         a21 = self.perceived_deltas[follower][leader]['delta_min']
@@ -227,14 +179,6 @@ class SNGame:
         if exp_playF != playF:
             # Follower generated higher than expected social utility
             if C[playL,exp_playF] < C[playL,playF]:
-                # if (leader == 5 or follower == 5) and debugging:
-                    # print(1)
-                    # print([leader,follower])
-                    # print(A)
-                    # print(B)
-                    # print(C)
-                    # print([(playL,exp_playF),(playL,playF)])
-                    # print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[leader][follower]['delta_min']
                 temp = greedy_response2[playL]
                 self.perceived_deltas[leader][follower]['delta_min'] = np.maximum(B[playL,temp] - B[playL,playF],holder)
@@ -243,18 +187,9 @@ class SNGame:
                 if self.perceived_deltas[leader][follower]['delta_min'] >= self.perceived_deltas[leader][follower]['delta_max']:
                     self.perceived_deltas[leader][follower]['delta_max'] = self.delta_max
                     self.explore_prob[leader][follower] = 1/len(self.neighbors[leader])
-                # if (leader == 5 or follower == 5) and debugging:
-                    # print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
+
             # Follower generated lower than expected social utility
             elif C[playL,exp_playF] > C[playL,playF]:
-                # if (leader == 5 or follower == 5) and debugging:
-                    # print(2)
-                    # print([leader,follower])
-                    # print(A)
-                    # print(B)
-                    # print(C)
-                    # print([(playL,exp_playF),(playL,playF)])
-                    # print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[leader][follower]['delta_max']
                 temp = greedy_response2[playL]
                 self.perceived_deltas[leader][follower]['delta_max'] = np.minimum(B[playL,temp] - B[playL,exp_playF],holder)
@@ -263,37 +198,20 @@ class SNGame:
                 if self.perceived_deltas[leader][follower]['delta_min'] >= self.perceived_deltas[leader][follower]['delta_max']:
                     self.perceived_deltas[leader][follower]['delta_min'] = 0
                     self.explore_prob[leader][follower] = 1/len(self.neighbors[leader])
-                # if (leader == 5 or follower == 5) and debugging:
-                    # print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
+
         else:
             temp = greedy_response2[playL]
             j = (temp+1)%2
+
             # Follower did what was expected, but still gave something up
             if C[playL,playF] > C[playL,temp]:
-                # if (leader == 5 or follower == 5) and debugging:
-                    # print(3)
-                    # print([leader,follower])
-                    # print(A)
-                    # print(B)
-                    # print(C)
-                    # print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[leader][follower]['delta_min']
                 self.perceived_deltas[leader][follower]['delta_min'] = np.maximum(B[playL,temp] - B[playL,playF],holder)
-                # if (leader == 5 or follower == 5) and debugging:
-                    # print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
+
             # Follower did what was expected, gave nothing up
             elif C[playL,playF] < C[playL,j]:
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print(4)
-                #     print([leader,follower])
-                #     print(A)
-                #     print(B)
-                #     print(C)
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[leader][follower]['delta_max']
                 self.perceived_deltas[leader][follower]['delta_max'] = np.minimum(B[playL,temp] - B[playL,j],holder)
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
 
         #Update follower's perception of leader
         assumed_delta1 = self.perceived_deltas[follower][leader]['delta_estimate']
@@ -303,14 +221,6 @@ class SNGame:
         if exp_playL != playL:
             # Leader expected to generate more social utility than follower expected it to expect
             if C[playL,exp_playF] > C[exp_playL,exp_playFF]:
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print(5)
-                #     print([leader,follower])
-                #     print(A)
-                #     print(B)
-                #     print(C)
-                #     print([(exp_playL,exp_playFF),(playL,exp_playF)])
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[follower][leader]['delta_min']
                 self.perceived_deltas[follower][leader]['delta_min'] = np.maximum(best1 - A[playL,exp_playF],holder)
 
@@ -318,18 +228,9 @@ class SNGame:
                 if self.perceived_deltas[follower][leader]['delta_min'] >= self.perceived_deltas[follower][leader]['delta_max']:
                     self.perceived_deltas[follower][leader]['delta_max'] = self.delta_max
                     self.explore_prob[follower][leader] = 1/len(self.neighbors[follower])
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
+
             # Leader expected to generate less social utility than follower expected it to expect
             elif C[playL,exp_playF] < C[exp_playL,exp_playF]:
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print(6)
-                #     print([leader,follower])
-                #     print(A)
-                #     print(B)
-                #     print(C)
-                #     print([(exp_playL,exp_playFF),(playL,exp_playF)])
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[follower][leader]['delta_max']
                 self.perceived_deltas[follower][leader]['delta_max'] = np.minimum(best1 - A[exp_playL,exp_playFF],holder)
 
@@ -337,57 +238,15 @@ class SNGame:
                 if self.perceived_deltas[follower][leader]['delta_min'] >= self.perceived_deltas[follower][leader]['delta_max']:
                     self.perceived_deltas[follower][leader]['delta_min'] = 0
                     self.explore_prob[follower][leader] = 1/len(self.neighbors[follower])
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
 
         # Leader behaves as expected
         else:
             if C[playL,exp_playF] > C[i,respi]:
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print(7)
-                #     print([leader,follower])
-                #     print(A)
-                #     print(B)
-                #     print(C)
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[follower][leader]['delta_min']
-                # print([holder,A[i,respi],A[playL,exp_playF]])
                 self.perceived_deltas[follower][leader]['delta_min'] = np.maximum(best1 - A[playL,exp_playF],holder)
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
             if C[playL,exp_playF] < C[i,respi]:
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print(8)
-                #     print([leader,follower])
-                #     print(A)
-                #     print(B)
-                #     print(C)
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
                 holder = self.perceived_deltas[follower][leader]['delta_max']
-                # print([holder,A[i,respi],A[playL,exp_playF]])
                 self.perceived_deltas[follower][leader]['delta_max'] = np.minimum(A[i,respi] - A[playL,exp_playF],holder)
-                # if (leader == 5 or follower == 5) and debugging:
-                #     print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
-
-        b11 = self.perceived_deltas[leader][follower]['delta_min']
-        b12 = self.perceived_deltas[leader][follower]['delta_max']
-        b21 = self.perceived_deltas[follower][leader]['delta_min']
-        b22 = self.perceived_deltas[follower][leader]['delta_max']
-        if (b11 < a11 or b12 > a12 or b21 < a21 or b22 > a22 or b22 <= b21 or b12 <= b11 or b22 < delta1 or b12 < delta2):
-            print("\n\nLOOK HERE!!\n\n")
-            print([leader,follower])
-            print(A)
-            print(B)
-            print(C)
-            # print(holder)
-            print(best1)
-            print(greedy_response2[playL])
-            print(self.deltas[leader],self.deltas[follower])
-            print([(a11,a12),(a21,a22)])
-            print([(b11,b12),(b21,b22)])
-            print([playL,playF])
-            print([exp_playL,exp_playF,exp_playFF])
-            print([self.perceived_deltas[leader][follower],self.perceived_deltas[follower][leader]])
         return (playL,playF)
 
 
@@ -410,25 +269,18 @@ class SNGame:
             self.games_played[follower] += 1
         return (A[playL,playF],B[playL,playF])
 
-    # Currently only enabled for uniform games with game_type = "collab"
+    # Currently only enabled for game_type = "collab"
     def play_round(self):
         if self.game_type == "collab":
             self.play_round_collab()
             self.rounds +=1
             self.exploit_param +=1
-        elif self.game_type == "partner":
-            self.play_round_partnership_uniform()
-            self.rounds +=1
-        elif self.game_type == "dictator":
-            self.play_round_dictator_uniform()
-            self.rounds +=1
         else:
             print("Invalid game type")
 
     def estimate_game_value(self,leader,follower):
         sumL = 0
         sumF = 0
-        # for i in range(estimate_n):
         (valL,valF) = self.play_game(leader,follower,estimating=True)
         sumL += valL - cost
         sumF += valF - cost
@@ -437,16 +289,14 @@ class SNGame:
     def select_uniform_collaborators(self,i,neighbors):
         if self.known_deltas:
             helper = lambda x: self.deltas[x]
-            # neighbors = sorted(self.neighbors[i], key = helper,reverse=True)
         else:
             helper = lambda x: self.perceived_deltas[i][x]['delta_estimate']
-            # neighbors = sorted(self.neighbors[i], key = helper, reverse = True)
-        if (len(neighbors) <= self.k) or (helper(neighbors[self.k-1]) > helper(neighbors[self.k])):
+
+        if (len(neighbors) <= self.k) or (helper(neighbors[self.k-1]) > helper(neighbors[self.k])) or lexicographic:
             followers = neighbors[:self.k]
             return followers
         else:
             # There are several more elements with same delta.
-            # print(i,neighbors,helper(neighbors))
             l = len(neighbors)
             x = neighbors.pop(0)
             temp  = [x]
@@ -465,34 +315,72 @@ class SNGame:
             if count == self.k:
                 return temp
             else:
-
                 followers = temp[:idx]
                 sampler = temp[idx:]
-                # print(i,temp,followers,sampler, helper(temp))
                 samples = self.k-idx
                 followers = followers+(random.sample(sampler,samples))
-                # print(i,followers)
                 return followers
 
+    # Computes score utility of a set of deltas as utility from switching + rho * utility after neighbors switch in response
+    def update_player_forecast(self,player):
+        if not (self.known_deltas and self.uniform):
+            raise ForecastError('Invalid forecast settings')
+        else:
+            delta_set = [self.delta_max/(self.m-1)*i for i in range(self.m)]
+            best_delta = 0
+            best_util = -np.Inf
+            deltas = np.copy(self.deltas)
+            for d in delta_set:
+                print(self.rounds,player,d)
+                x1 = self.expected_utility_total(player,d,update=True)
+                self.deltas[player] = d
+                new_deltas = np.zeros([1,self.n])
+                for i in self.neighbors[player]:
+                    if (i != player):
+                        print(self.rounds,player,d,i)
+                        new_deltas[0,i] = self.update_player_collab(i)
+                new_deltas[0,player] = d
+                self.deltas = new_deltas[0]
+                x2 = rho*self.expected_utility_total(player,d,update=True)
+                util = x1+x2
+                if util > best_util:
+                    best_util = util
+                    best_delta = d
+                self.deltas = np.copy(deltas)
+            return best_delta
 
+    # Updates all players using the forecasting evaluation
+    def update_collab_forecast(self):
+        new_deltas = np.zeros([1,self.n])
+        deltas = np.copy(self.deltas)
+        for i in range(self.n):
+            if self.update_player(i):
+                print("Updating",self.rounds,i)
+                new_deltas[0,i] = self.update_player_forecast(i)
+            else:
+                new_deltas[0,i] = self.deltas[i]
+        new_deltas = new_deltas[0]
+        self.deltas = new_deltas
 
-
+    # Plays a round between players when game_type="collab"
     def play_round_collab(self):
         if self.known_deltas and self.uniform:
             for i in range(self.n):
                 helper = lambda x: self.deltas[x]
                 neighbors = sorted(self.neighbors[i], key = helper,reverse=True)
-                # print(i,neighbors)
                 followers = self.select_uniform_collaborators(i,neighbors)
-                # print(followers)
                 for j in followers:
                     self.play_game(i,j)
         else:
             for i in range(self.n):
                 estimates = {}
+
+                # If uniform, use delta_estimates to determine partner value
                 if self.uniform:
                     for j in self.neighbors[i]:
                         estimates[j] = self.perceived_deltas[i][j]['delta_estimate']
+
+                # If non-uniform, use numerical utility estimates to determine partner value
                 else:
                     for j in self.neighbors[i]:
                         for l in range(estimate_n):
@@ -510,19 +398,15 @@ class SNGame:
                         followers = neighbors[:exploit]
                         remainder = neighbors[exploit:]
                         explore = self.k - exploit
-                        # print([i,followers,remainder,exploit])
                         if update_scheme == 1:
                             prob = np.zeros(len(remainder))
-                            # print(i, remainder,prob,explore)
                             prob_tot = 0
                             count = 0
                             for j in remainder:
                                 prob[count] = self.explore_prob[i][j]
                                 prob_tot += self.explore_prob[i][j]
                                 count +=1
-                            # print(prob_tot,prob/prob_tot)
                             extra = list(rand.choice(remainder,explore,replace=False,p= prob/prob_tot))
-                            # print(followers,extra)
                             followers = followers + extra
                         elif update_scheme ==2:
                             followers = followers + random.sample(remainder,explore)
@@ -535,10 +419,8 @@ class SNGame:
                 for i in range(self.n):
                     for j in self.neighbors[i]:
                         # Update delta_estimate
-                        self.perceived_deltas[i][j]['delta_estimate'] = ((self.perceived_deltas[i][j]['delta_max']-self.perceived_deltas[i][j]['delta_min'])/2 +
-                            self.perceived_deltas[i][j]['delta_min'])
-                        self.perceived_deltas[j][i]['delta_estimate'] = ((self.perceived_deltas[j][i]['delta_max']-self.perceived_deltas[j][i]['delta_min'])/2 +
-                            self.perceived_deltas[j][i]['delta_min'])
+                        self.perceived_deltas[i][j]['delta_estimate'] = (self.perceived_deltas[i][j]['delta_max']+self.perceived_deltas[i][j]['delta_min'])/2
+                        self.perceived_deltas[j][i]['delta_estimate'] = (self.perceived_deltas[j][i]['delta_max']+self.perceived_deltas[j][i]['delta_min'])/2
 
     def exploit_num(self,node = 0):
         if update_scheme == 1:
@@ -551,89 +433,34 @@ class SNGame:
             epsilon = np.minimum(1.0,2.0/(self.exploit_param+1))
         return rand.binomial(self.k,1-epsilon)
 
-    def play_round_partnership_uniform(self):
-        order = []
-        k = self.k
-        for i in range(self.n):
-            order.append(i)
-        helper = lambda x:self.deltas[x]
-        order = sorted(order, key = helper,reverse=True)
-        plays = np.zeros(self.n)
-        for i in order:
-            neighbors = sorted(self.neighbors[i],key = helper,reverse=True)
-            for j in neighbors:
-                if plays[i] >= k:
-                    break
-                elif plays[j] < k:
-                    flip = rand.randint(2)
-                    if flip == 1:
-                        leader = i
-                        follower = j
-                    else:
-                        leader = j
-                        follower = i
-                    self.play_game(leader,follower)
-                    plays[i] +=1
-                    plays[j] +=1
-
-    def play_round_dictator_uniform(self):
-        order = rand.permutation(self.n)
-        helper = lambda x:self.deltas[x]
-        k = self.k
-        plays = np.zeros(self.n)
-        for i in order:
-            neighbors = sorted(self.neighbors[i],key = helper,reverse=True)
-            for j in neighbors:
-                if plays[i] >= k:
-                    break
-                elif plays[j] < k:
-                    flip = rand.randint(2)
-                    if flip == 1:
-                        leader = i
-                        follower = j
-                    else:
-                        leader = j
-                        follower = i
-                    self.play_game(leader,follower)
-                    plays[i] +=1
-                    plays[j] +=1
-
     # Does not worry about explore-exploit problem
     def select_collaborators(self,j,update=False):
         # For known deltas, use true delta values to estimate
-        # if self.uniform:
-        #     if self.known_deltas:
-        #         helper = lambda x:self.deltas[x]
-        #     else:
-        #         helper = lambda x:self.perceived_deltas[j][x]['delta_estimate']
         if self.known_deltas:
             if self.uniform:
                 helper = lambda x: self.deltas[x]
             else:
                 helper = lambda x:self.expected_utility_game(j,x,self.deltas[j],self.deltas[x],update=update)
-            # For unknown deltas and a hypothetical delta_j, use that and perceived deltas to estimate
+
+        # For unknown deltas and a hypothetical delta_j, use that and perceived deltas to estimate
         else:
             if self.uniform:
                 helper = lambda x: self.perceived_deltas[j][x]['delta_estimate']
             else:
                 helper = lambda x:self.expected_utility_game(j,x,self.deltas[j],self.perceived_deltas[j][x]['delta_estimate'],update=update)
-        # if not self.uniform:
         neighbors = sorted(self.neighbors[j],key=helper,reverse=True)
-        # print(neighbors)
-        # print(helper(neighbors))
         if not self.uniform:
             collaborators = neighbors[:self.k]
             return collaborators
         else:
             return self.select_uniform_collaborators(j,neighbors)
 
-    # Only for uniform systems
+    # Predict the invitations j will issue in uniform systems
     def predict_invites(self,j):
         neighbors = self.neighbors[j]
         invites = []
         if self.known_deltas:
             for i in neighbors:
-                # per_delta = self.perceived_deltas[i][j]['delta_estimate']
                 collab_i = self.select_collaborators(i,update = False)
                 if j in collab_i:
                     invites.append(i)
@@ -649,7 +476,7 @@ class SNGame:
                     invites.append(i)
         return invites
 
-
+    # Determine the expected utility of a game between the leader and follower with delta1,delta2 respectively
     def expected_utility_game(self,leader,follower,delta1,delta2,update=True):
         util_L = 0
         util_F = 0
@@ -661,30 +488,14 @@ class SNGame:
             (val_L,val_F) = self.play_game(leader,follower,estimating=True)
             util_L += val_L
             util_F += val_F
-        #
-        # # print(leader,follower)
-        # # print(delta1,delta2)
-        # m1 = int(round(delta1*(self.m-1)/self.delta_max))
-        # m2 = int(round(delta2*(self.m-1)/self.delta_max))
-        # # print(leader,follower,m1,m2)
-        # # print(m1)
-        # # print(m2)
-        # # print(delta1)
-        # # print(delta2)
-        # util_L = util_L/exp_util_memory + self.expected_utility[leader,follower,m1,m2,0]*(exp_util_memory-1.0)/exp_util_memory
-        # util_F = util_F/exp_util_memory + self.expected_utility[leader,follower,m1,m2,1]*(exp_util_memory-1.0)/exp_util_memory
-        # if update:
-        #     self.expected_utility[leader,follower,m1,m2,0] = util_L
-        #     self.expected_utility[leader,follower,m1,m2,1] = util_F
         self.deltas[leader] = d1
         self.deltas[follower] = d2
-        return util_L #,util_F
+        return util_L
 
     # Estimate the expected utility of using delta for player
     def expected_utility_total(self,player,delta,update=True):
         old_delta = self.deltas[player]
         self.deltas[player] = delta
-        # print(delta)
         collabs = self.select_collaborators(player,update=update)
         util = 0
         for i in collabs:
@@ -706,61 +517,49 @@ class SNGame:
         self.deltas[player] = old_delta
         return util
 
-
-        # m1 = int(round(delta*(self.m-1)/self.delta_max))
-        # for i in collabs:
-        #     m2 = int(round(self.deltas[i]*(self.m-1)/self.delta_max))
-        #     util += self.expected_utility[player,i,m1,m2,0]
-        # invites = self.predict_invites(player)
-        # for i in invites:
-        #     m2 = int(round(self.deltas[i]*(self.m-1)/self.delta_max))
-        #     util += self.expected_utility[i,player,m2,m1,1]
-        # return util
-
-
-    def update_player_collab(self,j):
-        if j not in self.fixed_deltas:
-            delta_set = [self.delta_max/(self.m-1)*i for i in range(self.m)]
+    # Determine the optimal delta_i for agent i in the current system when game_type="collab"
+    def update_player_collab(self,i):
+        if i not in self.fixed_deltas:
+            delta_set = [self.delta_max/(self.m-1)*j for j in range(self.m)]
             best_util = 0
             best_delta = 0
             for delta in delta_set:
-                util = self.expected_utility_total(j,delta)
-                print(self.rounds,j,delta,util)
+                util = self.expected_utility_total(i,delta)
+                print(self.rounds,i,delta,util)
                 if util >= best_util:
                     best_util = util
                     best_delta=delta
-            util = self.expected_utility_total(j,self.deltas[j])
+            util = self.expected_utility_total(i,self.deltas[i])
             if util >= best_util + lazy_factor:
-                best_delta = self.deltas[j]
+                best_delta = self.deltas[i]
             return best_delta
         else:
-            return self.deltas[j]
+            return self.deltas[i]
 
+    # Update all players in current system when game_type="collab"
     def update_collab(self):
         new_deltas = np.zeros([1,self.n])
         for i in range(self.n):
-            if self.update_player(i):
+            if self.update_player():
                 print("Updating",self.rounds)
                 new_deltas[0,i] = self.update_player_collab(i)
             else:
                 new_deltas[0,i] = self.deltas[i]
-        # print(new_deltas)
         new_deltas = new_deltas[0]
-        # print(self.rounds)
-        # print(new_deltas)
-        # print("Updated")
         self.deltas = new_deltas
 
-    def update_player(self,j):
+    # Determine whether to update a player
+    def update_player(self):
         update = False
+
         # Independent probability
         if update_scheme == 1:
             if rand.random() < update_prob:
                 update = True
+
         # Epoch scheme
         if update_scheme == 2:
             if self.rounds % epoch == epoch -1:
                 update = True
                 exploit_param = 0
-
         return update
